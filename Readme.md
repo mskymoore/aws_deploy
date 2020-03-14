@@ -16,5 +16,5 @@
 3. Run the following: 
 
 ```
-./deploy.sh
+./create_an_api.sh
 ```
