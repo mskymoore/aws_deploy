@@ -1,0 +1,134 @@
+---
+- hosts: local
+  gather_facts: false
+  become: false
+  
+  vars:
+    ssh_port: "22"
+    ssh_user: "admin"
+    server_config: "server_config"
+    
+  tasks:
+    - name: create ec2 instance
+      ec2:
+        instance_type: "t3.medium"
+        key_name: "sa-skynet"
+        assign_public_ip: true
+        instance_profile_name: "BaseIAMRole"
+        image: "ami-0bc3a7b3c40e1ef74"
+        region: "sa-east-1"
+        vpc_subnet_id: "subnet-b77a7bd3"
+        group_id: "sg-07ab767d9203fc46d"
+        ebs_optimized: true
+        source_dest_check: true
+        wait: true
+        volumes:
+          - device_name: "/dev/xvda"
+            encrypted: true
+            volume_type: gp2
+            volume_size: 33
+            delete_on_termination: true
+            snapshot: "snap-0696c4c9eb9ebeb0f"
+      register: server
+
+    - name: Set public IP fact
+      set_fact:
+         server_conf_dict: {
+         'server_ip': "{{ server.instances[0].public_ip }}",
+         'user': "{{ ssh_user }}",
+         'port': "{{ ssh_port }}"}
+      register: server_config_dict
+
+    - name: Create type A record for instance
+      route53:
+         state: "present"
+         zone: "isos.tech"
+         record: "restest.isos.tech"
+         type: "A"
+         ttl: 60
+         value: "{{ server_conf_dict.server_ip }}"
+         overwrite: true
+    
+    - name: Wait for SSH
+      wait_for:
+        port: "{{ ssh_port }}"
+        host: "{{ server_conf_dict.server_ip }}"
+        search_regex: SSH
+        delay: 10
+        timeout: 320
+
+    - name: Wait for boot process to finish
+      pause:
+        minutes: 2
+
+
+
+- hosts: aws
+  gather_facts: true
+  become: true
+  
+  pre_tasks:
+     - name: update package manager
+       apt:
+        update_cache: true
+  
+  vars:
+    docker_users:
+      - admin
+    pip_install_packages:
+      - docker
+    pip_package: python3-pip
+
+  roles:
+     - role: docker
+     - role: pip
+
+
+
+- hosts: aws
+  gather_facts: true
+  become: false
+
+  tasks:
+    - name: create openresty directory
+      file:
+        path: /home/admin/openresty
+        state: directory
+        mode: '777'
+
+    - name: deploy build openresty dockerfile
+      copy:
+        src: Dockerfile
+        dest: /home/admin/openresty
+        mode: '777'
+
+    - name: deploy locations file
+      copy:
+        src: locations.conf
+        dest: /home/admin/openresty
+        mode: '777'
+
+    #- name: build docker image
+    #  docker_image:
+    #    build:
+    #        path: /home/admin/openresty
+    #    name: isostech/openresty
+    #    push: false
+    #    source: build
+    #    state: present
+    - name: whoami
+      command: whoami
+      register: who
+    
+    - name: debug
+      debug:
+        msg:
+          - "{{ who }}"
+    
+    - name: build docker image
+      command: docker build -t isostech/openresty /home/admin/openresty
+      become: true
+    
+    - name: run openresty
+      command: docker run -d --name openresty -p 80:80 -d isostech/openresty
+      become: true

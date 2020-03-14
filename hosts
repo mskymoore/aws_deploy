@@ -1,0 +1,7 @@
+[aws]
+
+restest.isos.tech ansible_user=admin ansible_port=22 ansible_connection=ssh ansible_ssh_private_key_file=/Users/sky/.ssh/sa-skynet.pem ansible_python_interpreter=/usr/bin/python3 ansible_ssh_extra_args="-o StrictHostKeyChecking=no"
+
+[local]
+
+localhost ansible_connection=local ansible_python_interpreter=/usr/local/bin/python3
