@@ -11,9 +11,8 @@
 * python3 with botocore and boto3
 
 ## to deploy
-1. Install requirements
-2. Edit locations.conf, write your endpoints.
-3. Run the following: 
+1. Edit locations.conf, write your endpoints.
+2. Run the following: 
 
 ```
 ./create_an_api.sh
